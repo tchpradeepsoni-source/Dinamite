@@ -1,0 +1,246 @@
+ <!DOCTYPE html>
+<html>
+<head>
+  <title>D66 Final Complete</title>
+  <style>
+    body{background:#111;color:#0f0;font-family:monospace}
+    textarea{width:95%;height:200px;background:#222;color:#0f0}
+    pre{background:#000;height:160px;padding:10px;overflow:auto}
+    button{padding:8px;margin-top:5px}
+  </style>
+</head>
+<body>
+
+<h2>D66 Language (Final Complete)</h2>
+
+<textarea id="code">
+input name
+print hello name
+
+set x 10
+set y 5
+print total = x + y
+
+func calc
+add x y
+print new x = x
+end
+
+call calc
+
+if x > 10
+print big
+else
+print small
+end
+
+repeat 2
+print loop
+end
+
+set i 0
+while i < 3
+print i
+add i 1
+end
+</textarea>
+
+<br>
+<button onclick="run()">RUN</button>
+
+<pre id="out"></pre>
+
+<script>
+
+let vars = {};
+let funcs = {};
+
+// value
+function val(v){
+  if(!isNaN(v)) return Number(v);
+  return vars[v] ?? 0;
+}
+
+// safe math
+function solve(expr){
+  try{
+    return Function("return " + expr)();
+  }catch{
+    return expr;
+  }
+}
+
+// print (FIXED)
+function doPrint(line){
+
+  let text = line.slice(6);
+
+  // safe variable replace (word by word)
+  text = text.split(" ").map(w=>{
+    return vars[w] !== undefined ? vars[w] : w;
+  }).join(" ");
+
+  // math solve
+  if(text.includes("=")){
+    let parts = text.split("=");
+    let left = parts[0];
+    let right = parts[1];
+
+    let res = solve(right);
+    text = left + "= " + res;
+  }
+
+  output(text);
+}
+
+// output
+function output(t){
+  document.getElementById("out").innerText += t + "\n";
+}
+
+// EXECUTION ENGINE
+function execute(lines){
+
+  for(let i=0;i<lines.length;i++){
+
+    let line = lines[i].trim();
+    if(!line) continue;
+
+    let p = line.toLowerCase().split(" ");
+    let cmd = p[0];
+
+    try{
+
+      // INPUT
+      if(cmd=="input"){
+        let v = prompt("Enter value:");
+        vars[p[1]] = isNaN(v) ? v : Number(v);
+      }
+
+      // SET
+      else if(cmd=="set"){
+        vars[p[1]] = val(p[2]);
+      }
+
+      // ADD
+      else if(cmd=="add"){
+        vars[p[1]] = val(p[1]) + val(p[2]);
+      }
+
+      // PRINT
+      else if(cmd=="print"){
+        doPrint(line);
+      }
+
+      // IF ELSE
+      else if(cmd=="if"){
+        let a=val(p[1]), op=p[2], b=val(p[3]);
+
+        let cond=false;
+        if(op==">") cond=a>b;
+        if(op=="<") cond=a<b;
+        if(op=="==") cond=a==b;
+
+        let ifBlock=[], elseBlock=[], mode="if";
+        i++;
+
+        while(i<lines.length){
+          let l=lines[i].trim().toLowerCase();
+          if(l=="end") break;
+
+          if(l=="else"){ mode="else"; i++; continue; }
+
+          if(mode=="if") ifBlock.push(lines[i]);
+          else elseBlock.push(lines[i]);
+
+          i++;
+        }
+
+        if(cond) execute(ifBlock);
+        else execute(elseBlock);
+      }
+
+      // FUNCTION
+      else if(cmd=="func"){
+        let name=p[1], block=[];
+        i++;
+
+        while(i<lines.length && lines[i].trim().toLowerCase()!="end"){
+          block.push(lines[i]);
+          i++;
+        }
+
+        funcs[name]=block;
+      }
+
+      // CALL
+      else if(cmd=="call"){
+        if(funcs[p[1]]) execute(funcs[p[1]]);
+        else output("Error: function not found");
+      }
+
+      // REPEAT
+      else if(cmd=="repeat"){
+        let count = val(p[1]);
+        let block=[];
+        i++;
+
+        while(i<lines.length && lines[i].trim().toLowerCase()!="end"){
+          block.push(lines[i]);
+          i++;
+        }
+
+        for(let j=0;j<count;j++){
+          execute(block);
+        }
+      }
+
+      // WHILE
+      else if(cmd=="while"){
+        let a=p[1], op=p[2], b=p[3];
+        let block=[];
+        i++;
+
+        while(i<lines.length && lines[i].trim().toLowerCase()!="end"){
+          block.push(lines[i]);
+          i++;
+        }
+
+        function cond(){
+          if(op==">") return val(a)>val(b);
+          if(op=="<") return val(a)<val(b);
+          if(op=="==") return val(a)==val(b);
+          return false;
+        }
+
+        while(cond()){
+          execute(block);
+        }
+      }
+
+      // UNKNOWN
+      else{
+        output("Error: unknown command -> " + cmd);
+      }
+
+    }catch(e){
+      output("Error: " + e.message);
+    }
+
+  }
+}
+
+// RUN
+function run(){
+  vars = {};
+  funcs = {};
+  document.getElementById("out").innerText = "";
+
+  let lines = document.getElementById("code").value.split("\n");
+  execute(lines);
+}
+
+</script>
+
+</body>
+</html>
